@@ -2,17 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Measure download throughput, upload throughput, and browser-to-server response time.">
-  <title>Internet Speed Checker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">\n  <link rel="icon" type="image/png" href="/static/assets/rankrush-icon.png">
+  <meta name="description" content="Rankrush Speed Test estimates download speed, upload speed, and browser-to-server response time.">
+  <title>Rankrush Speed Test</title>
   <style>
-    :root { color-scheme: dark; --bg:#07111f; --panel:#101e31; --muted:#a8b7ca; --blue:#55a7ff; --green:#54e0ae; --warn:#ffd166; }
+    :root { color-scheme: dark; --bg:#050b18; --panel:#0c1730; --muted:#a8b7ca; --blue:#0b5fff; --navy:#072a75; --green:#0b5fff; --warn:#ffd166; }
     * { box-sizing:border-box; }
-    body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:radial-gradient(circle at top,#142b49 0,#07111f 48%); color:#f5f8ff; min-height:100vh; }
+    body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:radial-gradient(circle at top,#0d1d43 0,#050b18 52%); color:#f5f8ff; min-height:100vh; }
     main { width:min(920px,92%); margin:0 auto; padding:42px 0 32px; }
-    .eyebrow { color:var(--green); text-transform:uppercase; letter-spacing:.15em; font-size:.78rem; font-weight:700; }
-    h1 { font-size:clamp(2rem,6vw,3.4rem); margin:.5rem 0; line-height:1.1; }
-    .intro { color:var(--muted); max-width:680px; line-height:1.65; }
+    .brand { display:flex; justify-content:center; align-items:center; width:min(460px,100%); margin:0 auto 26px; padding:12px 20px; background:#fff; border:1px solid #dbe5f5; border-radius:18px; box-shadow:0 14px 38px #0004; }\n    .brand img { display:block; width:100%; max-height:100px; object-fit:contain; }\n    .eyebrow { color:#6fa1ff; text-transform:uppercase; letter-spacing:.15em; font-size:.78rem; font-weight:700; text-align:center; }
+    h1 { font-size:clamp(2rem,6vw,3.4rem); margin:.5rem 0; line-height:1.1; text-align:center; }
+    .intro { color:var(--muted); max-width:680px; line-height:1.65; margin-left:auto; margin-right:auto; text-align:center; }
     .notice { margin-top:20px; padding:14px 16px; border:1px solid #725b26; background:#3a2d12; border-radius:14px; color:#ffe6a6; line-height:1.55; }
     .notice[hidden] { display:none; }
     .panel { background:rgba(16,30,49,.92); border:1px solid #263b55; border-radius:24px; padding:clamp(20px,5vw,38px); margin-top:24px; box-shadow:0 24px 70px #0005; }
@@ -22,7 +22,7 @@
     #mainValue { font-size:3rem; font-weight:750; letter-spacing:-.05em; }
     .unit { color:var(--muted); font-size:.95rem; }
     #status { min-height:1.5em; text-align:center; color:var(--muted); line-height:1.5; }
-    button { display:block; width:min(320px,100%); margin:18px auto 0; border:0; border-radius:999px; padding:15px 24px; color:#061321; background:var(--green); font-weight:800; font-size:1rem; cursor:pointer; }
+    button { display:block; width:min(320px,100%); margin:18px auto 0; border:0; border-radius:999px; padding:15px 24px; color:#061321; background:var(--blue); color:#fff; font-weight:800; font-size:1rem; cursor:pointer; }
     button:disabled { opacity:.6; cursor:wait; }
     .metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:28px; }
     .metric { background:#0b1727; border:1px solid #263b55; border-radius:16px; padding:18px 12px; text-align:center; }
@@ -46,15 +46,15 @@
     To test your connection, deploy this app to a public HTTPS host and open that public URL.
   </div>
 
-  <section class="panel" aria-label="Internet speed test">
+  <section class="panel" aria-label="Rankrush internet speed test">
     <div class="gauge-wrap">
       <div class="gauge">
         <div id="mainValue">--</div>
         <div class="unit" id="mainUnit">Mbps</div>
       </div>
     </div>
-    <div id="status" role="status" aria-live="polite">Ready when you are.</div>
-    <button id="startButton" type="button">Start speed test</button>
+    <div id="status" role="status" aria-live="polite">Ready to test your connection.</div>
+    <button id="startButton" type="button">Start test</button>
 
     <div class="metrics">
       <div class="metric">
@@ -70,9 +70,9 @@
         <div class="value" id="pingValue">--</div>
       </div>
     </div>
-    <p class="note">Download and upload are estimated from bytes transferred divided by elapsed time. Response time is browser-to-server HTTP latency, not ICMP ping. Server capacity, hosting location, routing, Wi-Fi quality, and device load can affect results.</p>
+    <p class="note">Download and upload are estimates for the route between your browser and Rankrush test server, not a guaranteed measurement of your full ISP connection. Response time is browser-to-server HTTP latency, not ICMP ping. Server capacity, hosting location, routing, Wi-Fi quality, and device load affect results.</p>
   </section>
-  <footer>Testing transfers data. This Vercel starter uses 4 MiB transfers to stay below the function payload limit. These short transfers can be inaccurate on fast connections. Avoid running repeated tests unnecessarily.</footer>
+  <footer>Rankrush Speed Test runs three small transfer trials to reduce one-off measurement noise. Vercel limits each transfer request, so results may differ from dedicated services such as Ookla Speedtest, especially on fast connections.</footer>
 </main>
 
 <script>
@@ -132,24 +132,30 @@
       results.push(bytesToMbps(data.byteLength, seconds));
     }
     results.sort((a, b) => a - b);
-    return (results[0] + results[1]) / 2;
+    return results[1];
   }
 
   async function measureUpload() {
-    // A 4 MiB payload stays within Vercel's function request limit.
+    // Three separate 4 MiB requests stay below Vercel's per-request payload limit.
+    // Report the median so one slow/fast request has less influence.
     const bytes = 4 * 1024 * 1024;
-    const payload = new Blob([new Uint8Array(bytes)]);
-    const start = performance.now();
-    const response = await timedFetch(`/api/upload?trial=${crypto.randomUUID()}`, {
-      method: "POST",
-      body: payload,
-      headers: { "Content-Type": "application/octet-stream" },
-      cache: "no-store"
-    });
-    const result = await response.json();
-    const seconds = (performance.now() - start) / 1000;
-    if (!result.received_bytes || seconds <= 0) throw new Error("Upload measurement was invalid. Please retry.");
-    return bytesToMbps(result.received_bytes, seconds);
+    const results = [];
+    for (let i = 0; i < 3; i++) {
+      const payload = new Blob([new Uint8Array(bytes)]);
+      const start = performance.now();
+      const response = await timedFetch(`/api/upload?trial=${crypto.randomUUID()}`, {
+        method: "POST",
+        body: payload,
+        headers: { "Content-Type": "application/octet-stream" },
+        cache: "no-store"
+      });
+      const result = await response.json();
+      const seconds = (performance.now() - start) / 1000;
+      if (result.received_bytes !== bytes || seconds <= 0) throw new Error("Upload measurement was invalid. Please retry.");
+      results.push(bytesToMbps(result.received_bytes, seconds));
+    }
+    results.sort((a, b) => a - b);
+    return results[1];
   }
 
   function showSpeed(value, target) {
