@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Measure download throughput, upload throughput, and browser-to-server response time.">
+  <title>Internet Speed Checker</title>
+  <style>
+    :root { color-scheme: dark; --bg:#07111f; --panel:#101e31; --muted:#a8b7ca; --blue:#55a7ff; --green:#54e0ae; --warn:#ffd166; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:radial-gradient(circle at top,#142b49 0,#07111f 48%); color:#f5f8ff; min-height:100vh; }
+    main { width:min(920px,92%); margin:0 auto; padding:42px 0 32px; }
+    .eyebrow { color:var(--green); text-transform:uppercase; letter-spacing:.15em; font-size:.78rem; font-weight:700; }
+    h1 { font-size:clamp(2rem,6vw,3.4rem); margin:.5rem 0; line-height:1.1; }
+    .intro { color:var(--muted); max-width:680px; line-height:1.65; }
+    .notice { margin-top:20px; padding:14px 16px; border:1px solid #725b26; background:#3a2d12; border-radius:14px; color:#ffe6a6; line-height:1.55; }
+    .notice[hidden] { display:none; }
+    .panel { background:rgba(16,30,49,.92); border:1px solid #263b55; border-radius:24px; padding:clamp(20px,5vw,38px); margin-top:24px; box-shadow:0 24px 70px #0005; }
+    .gauge-wrap { display:flex; justify-content:center; margin:8px 0 22px; }
+    .gauge { width:220px; height:220px; border-radius:50%; border:10px solid #263b55; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; background:radial-gradient(circle,#142a45,#0c192a); }
+    .gauge:before { content:""; position:absolute; inset:-10px; border-radius:50%; border:10px solid transparent; border-top-color:var(--blue); transform:rotate(-35deg); }
+    #mainValue { font-size:3rem; font-weight:750; letter-spacing:-.05em; }
+    .unit { color:var(--muted); font-size:.95rem; }
+    #status { min-height:1.5em; text-align:center; color:var(--muted); line-height:1.5; }
+    button { display:block; width:min(320px,100%); margin:18px auto 0; border:0; border-radius:999px; padding:15px 24px; color:#061321; background:var(--green); font-weight:800; font-size:1rem; cursor:pointer; }
+    button:disabled { opacity:.6; cursor:wait; }
+    .metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:28px; }
+    .metric { background:#0b1727; border:1px solid #263b55; border-radius:16px; padding:18px 12px; text-align:center; }
+    .metric .label { color:var(--muted); font-size:.9rem; }
+    .metric .value { font-size:clamp(1.35rem,4vw,2rem); font-weight:750; margin-top:7px; overflow-wrap:anywhere; }
+    .unit-small { color:var(--muted); font-size:.8rem; }
+    .note { color:var(--muted); font-size:.85rem; line-height:1.6; margin-top:22px; }
+    footer { color:#8294aa; text-align:center; font-size:.82rem; margin-top:24px; line-height:1.5; }
+    @media(max-width:560px) { main { padding-top:28px; } .metrics { grid-template-columns:1fr; } .metric { display:flex; align-items:center; justify-content:space-between; text-align:left; } .metric .value { margin:0; } .gauge { width:190px; height:190px; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">Connection diagnostics</div>
+  <h1>Internet Speed Checker</h1>
+  <p class="intro">Measures data transfer and response time between this browser and the server hosting this page.</p>
+
+  <div class="notice" id="localNotice" hidden>
+    <strong>Local testing mode:</strong> this page is running on your own computer (localhost).
+    Results here do <strong>not</strong> measure your Wi-Fi or internet speed because the test traffic does not travel over the internet.
+    To test your connection, deploy this app to a public HTTPS host and open that public URL.
+  </div>
+
+  <section class="panel" aria-label="Internet speed test">
+    <div class="gauge-wrap">
+      <div class="gauge">
+        <div id="mainValue">--</div>
+        <div class="unit" id="mainUnit">Mbps</div>
+      </div>
+    </div>
+    <div id="status" role="status" aria-live="polite">Ready when you are.</div>
+    <button id="startButton" type="button">Start speed test</button>
+
+    <div class="metrics">
+      <div class="metric">
+        <div><div class="label">Download</div><div class="unit-small">Mbps</div></div>
+        <div class="value" id="downloadValue">--</div>
+      </div>
+      <div class="metric">
+        <div><div class="label">Upload</div><div class="unit-small">Mbps</div></div>
+        <div class="value" id="uploadValue">--</div>
+      </div>
+      <div class="metric">
+        <div><div class="label">Response time</div><div class="unit-small">ms</div></div>
+        <div class="value" id="pingValue">--</div>
+      </div>
+    </div>
+    <p class="note">Download and upload are estimated from bytes transferred divided by elapsed time. Response time is browser-to-server HTTP latency, not ICMP ping. Server capacity, hosting location, routing, Wi-Fi quality, and device load can affect results.</p>
+  </section>
+  <footer>Testing transfers data. This Vercel starter uses 4 MiB transfers to stay below the function payload limit. These short transfers can be inaccurate on fast connections. Avoid running repeated tests unnecessarily.</footer>
+</main>
+
+<script>
+  const startButton = document.getElementById("startButton");
+  const statusText = document.getElementById("status");
+  const mainValue = document.getElementById("mainValue");
+  const mainUnit = document.getElementById("mainUnit");
+  const downloadValue = document.getElementById("downloadValue");
+  const uploadValue = document.getElementById("uploadValue");
+  const pingValue = document.getElementById("pingValue");
+  const localNotice = document.getElementById("localNotice");
+
+  const isLocalhost = ["localhost", "127.0.0.1", "::1"].includes(location.hostname);
+  if (isLocalhost) {
+    localNotice.hidden = false;
+    startButton.textContent = "Test unavailable on localhost";
+    startButton.disabled = true;
+    statusText.textContent = "Deploy the app to a public host to measure internet speed.";
+  }
+
+  const bytesToMbps = (bytes, seconds) => (bytes * 8 / seconds / 1_000_000);
+
+  async function timedFetch(url, options = {}) {
+    const response = await fetch(url, options);
+    if (!response.ok) {
+      if (response.status === 429) throw new Error("Too many requests. Wait one minute before testing again.");
+      throw new Error(`Test request failed (HTTP ${response.status}).`);
+    }
+    return response;
+  }
+
+  async function measurePing() {
+    const samples = [];
+    // One warm-up request, then five measured requests; use the median to reduce outliers.
+    const warmup = await timedFetch(`/api/ping?warmup=${crypto.randomUUID()}`, { cache: "no-store" });
+    await warmup.arrayBuffer();
+
+    for (let i = 0; i < 5; i++) {
+      const start = performance.now();
+      const response = await timedFetch(`/api/ping?sample=${crypto.randomUUID()}`, { cache: "no-store" });
+      await response.arrayBuffer();
+      samples.push(performance.now() - start);
+    }
+    samples.sort((a, b) => a - b);
+    return samples[Math.floor(samples.length / 2)];
+  }
+
+  async function measureDownload() {
+    // Use two trials and report the median. The payload is 25 MiB per trial.
+    const results = [];
+    for (let i = 0; i < 2; i++) {
+      const start = performance.now();
+      const response = await timedFetch(`/api/download?trial=${crypto.randomUUID()}`, { cache: "no-store" });
+      const data = await response.arrayBuffer();
+      const seconds = (performance.now() - start) / 1000;
+      if (data.byteLength === 0 || seconds <= 0) throw new Error("Download measurement was invalid. Please retry.");
+      results.push(bytesToMbps(data.byteLength, seconds));
+    }
+    results.sort((a, b) => a - b);
+    return (results[0] + results[1]) / 2;
+  }
+
+  async function measureUpload() {
+    // A 4 MiB payload stays within Vercel's function request limit.
+    const bytes = 4 * 1024 * 1024;
+    const payload = new Blob([new Uint8Array(bytes)]);
+    const start = performance.now();
+    const response = await timedFetch(`/api/upload?trial=${crypto.randomUUID()}`, {
+      method: "POST",
+      body: payload,
+      headers: { "Content-Type": "application/octet-stream" },
+      cache: "no-store"
+    });
+    const result = await response.json();
+    const seconds = (performance.now() - start) / 1000;
+    if (!result.received_bytes || seconds <= 0) throw new Error("Upload measurement was invalid. Please retry.");
+    return bytesToMbps(result.received_bytes, seconds);
+  }
+
+  function showSpeed(value, target) {
+    target.textContent = Number.isFinite(value) ? value.toFixed(2) : "--";
+  }
+
+  startButton.addEventListener("click", async () => {
+    if (isLocalhost) return;
+    startButton.disabled = true;
+    downloadValue.textContent = "--";
+    uploadValue.textContent = "--";
+    pingValue.textContent = "--";
+    mainValue.textContent = "--";
+    mainUnit.textContent = "Mbps";
+
+    try {
+      statusText.textContent = "Measuring browser-to-server response time...";
+      const ping = await measurePing();
+      pingValue.textContent = ping.toFixed(0);
+      mainValue.textContent = ping.toFixed(0);
+      mainUnit.textContent = "ms";
+
+      statusText.textContent = "Measuring download throughput (two trials)...";
+      const down = await measureDownload();
+      showSpeed(down, downloadValue);
+      mainValue.textContent = down.toFixed(2);
+      mainUnit.textContent = "Mbps";
+
+      statusText.textContent = "Measuring upload throughput...";
+      const up = await measureUpload();
+      showSpeed(up, uploadValue);
+      mainValue.textContent = up.toFixed(2);
+      mainUnit.textContent = "Mbps";
+      statusText.textContent = "Test complete. Results are for this browser-to-server route.";
+    } catch (error) {
+      statusText.textContent = error.message || "Something went wrong. Please try again.";
+    } finally {
+      startButton.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
